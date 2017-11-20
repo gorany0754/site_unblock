@@ -1,11 +1,13 @@
 import os,sys,thread,socket
 
 MAX_QUEUE = 20          # Max number of connection
-MAX_PKT_SIZE = 4096     # Max size of packet
+MAX_PKT_SIZE = 99999     # Max size of packet
 
 def main():
-
-    # Usage : python site_unblock.py
+    
+    # Usage  : python site_unblock.py
+    # Setting: set http proxy with localhost and port number 8080,
+    #   other protocol should be DIRECT so that browser can load images.
     
     port = 8080
     host = ''
@@ -38,20 +40,26 @@ def main():
 def proxy_thread(conn, client_addr):
 
     # get request from web browser
-    request = conn.recv()
+    request = conn.recv(MAX_PKT_SIZE)
 
     # split first line 
     line = request.split('\n')[0]
 
     # get url
     url = line.split(' ')[1]
-    
-    # find the webserver
+
+    # find the webserver and port
     http_pos = url.find("://")          # find pos of ://
     if (http_pos==-1):
-        webserver = url
+        temp = url
     else:
-        webserver = url[(http_pos+3):]       # cut off http://
+        temp = url[(http_pos+3):]       # get the rest of url
+
+    # find / in url and remove it
+    webserver_pos = temp.find("/")
+    if webserver_pos == -1:
+        webserver_pos = len(temp)
+    webserver = temp[:webserver_pos]
 
     try:
         # create a socket to connect to the end server
@@ -66,14 +74,11 @@ def proxy_thread(conn, client_addr):
         
         while 1:
             # receive data from end server
-            data = s.recv()
+            data = s.recv(MAX_PKT_SIZE)
+            print data
             # if 404 data, ignore it
-            if data.find('HTTP/1.1 404 Not Found') > 0:
-                data = data[1:]
-                # find 200 OK data
-                dummy_end= data.find('HTTP/1.1 200 OK')
-                data = data[dummy_end:]
-
+            if data.find('HTTP/1.1 404 Not Found') >= 0:
+                continue
             if (len(data) > 0):
                 # send to browser
                 conn.send(data)
